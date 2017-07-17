@@ -1,16 +1,13 @@
 /*
-   Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-
-   This file is licensed under the Apache License, Version 2.0 (the "License").
-   You may not use this file except in compliance with the License. A copy of
-   the License is located at
-
-    http://aws.amazon.com/apache2.0/
-
-   This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied. See the License for the
-   specific language governing permissions and limitations under the License.
-*/
+ * Author: Thales Pinheiro <thales@rets.ly>
+ * Since: 07/2017
+ *
+ * Consumes messages (envelopes) from the queue
+ *
+ * TODO:
+ * - Add CLI
+ * - Add filter feature
+ */
 
 package main
 
@@ -30,6 +27,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	. "github.com/tj/go-debug"
 )
+
+// Global vars
 
 var (
 	countReceived = 0
@@ -53,12 +52,14 @@ var (
 
 // Data structures
 
-// Payload check spec
+// Payload represents the content of one message
 type Payload struct {
 	Channel string `json:"channel"`
 	Name    string `json:"name"`
 	Msg     string `json:"msg"`
 }
+
+// Message represents one message from the envelope
 type Message struct {
 	Type             string    `json:"Type"`
 	MessageID        string    `json:"MessageId"`
@@ -73,6 +74,7 @@ type Message struct {
 
 // Helpers
 
+// Setup AWS
 func setupAWS() {
 	// Setup SNS
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -86,6 +88,8 @@ func setupAWS() {
 	debug("AWS configurated! Connecting to queue %s @ %s using %s as profile ", qURL, awsRegion, awsProfile)
 }
 
+// Create the specified directory
+//   Path can be relative (will be converted to absolute) or absolute
 func mkdirp(path string) string {
 	absolutePath, absError := filepath.Abs(directoryToStorePayload)
 
@@ -169,6 +173,7 @@ func deleteMessage(receiptHandle *string) {
 }
 
 // Get messages from the queue
+//   @TODO extract the processing part to another function
 func getMessage() {
 	// Get messages
 	receivedMI, receivedMIError := queue.ReceiveMessage(&sqs.ReceiveMessageInput{
@@ -234,18 +239,23 @@ func getMessage() {
 
 // Starts here
 
-// Run before anything
+// Tear up:
+//
+// - Setup AWS
+// - Create directory to store processed envelopes
 func init() {
 	setupAWS()
 	mkdirp(directoryToStorePayload)
 }
 
 // Entrypoint
+//   Where eveything starts, and happens
 func main() {
 	// Set interval pattern
-	t := time.NewTicker(time.Duration(interval) * time.Millisecond) // Read a new message every 10ms
+	t := time.NewTicker(time.Duration(interval) * time.Millisecond)
 
 	for {
+		// Read a new message every 10ms
 		getMessage()
 		<-t.C
 	}
